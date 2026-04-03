@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>รายการสินค้า - Repair Stock</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600&display=swap');
+        body { font-family: 'Prompt', sans-serif; background: #f4f7f6; padding: 15px; margin: 0; color: #333; }
+        .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+        .btn-back { text-decoration: none; color: #2575fc; font-weight: 600; display: flex; align-items: center; gap: 5px; }
+
+        /* การ์ดสินค้า */
+        .item-card { background: white; border-radius: 18px; padding: 15px; margin-bottom: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); position: relative; border-left: 6px solid #2575fc; cursor: pointer; }
+        .item-info b { font-size: 1.1rem; color: #1a202c; }
+        .item-info small { color: #718096; display: block; margin-top: 3px; }
+        .thumb-preview { display: flex; gap: 6px; margin-top: 10px; overflow-x: auto; padding-bottom: 5px; }
+        .thumb-preview img { width: 60px; height: 60px; border-radius: 10px; object-fit: cover; background: #eee; }
+        
+        /* ปุ่มลบในการ์ด */
+        .btn-del-card { position: absolute; top: 15px; right: 15px; color: #e53e3e; background: #fff5f5; border: none; padding: 8px; border-radius: 10px; cursor: pointer; font-size: 14px; }
+
+        /* Modal */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); justify-content: center; align-items: center; z-index: 1000; padding: 15px; box-sizing: border-box; }
+        .modal-content { background: white; border-radius: 25px; width: 100%; max-width: 450px; overflow: hidden; position: relative; animation: slideUp 0.3s ease-out; }
+        @keyframes slideUp { from { transform: translateY(50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+        /* Slider รูปภาพ */
+        .slider-container { position: relative; background: #000; height: 280px; display: flex; align-items: center; justify-content: center; }
+        .slider-container img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .nav-btn { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(255,255,255,0.3); color: white; border: none; width: 40px; height: 40px; border-radius: 50%; font-size: 20px; cursor: pointer; }
+        .nav-prev { left: 10px; }
+        .nav-next { right: 10px; }
+        .img-counter { position: absolute; bottom: 10px; right: 15px; background: rgba(0,0,0,0.5); color: white; padding: 2px 10px; border-radius: 10px; font-size: 12px; }
+
+        .detail-body { padding: 20px; }
+        .detail-body p { margin: 8px 0; font-size: 15px; }
+        .btn-close { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid #ddd; background: #f8f9fa; cursor: pointer; margin-top: 10px; font-family: 'Prompt'; }
+        .btn-delete-main { width: 100%; padding: 12px; border-radius: 12px; border: none; background: #fff5f5; color: #e53e3e; font-weight: 600; cursor: pointer; margin-top: 10px; font-family: 'Prompt'; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <a href="Search.html" class="btn-back"><span>←</span> กลับไปหน้าค้นหา</a>
+        <h2 id="catTitle" style="margin:0;">หมวดหมู่</h2>
+    </div>
+
+    <div id="list"></div>
+
+    <div id="modal" class="modal" onclick="closeModal()">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="slider-container">
+                <button class="nav-btn nav-prev" onclick="changeImg(-1)">❮</button>
+                <img id="mImg" src="">
+                <button class="nav-btn nav-next" onclick="changeImg(1)">❯</button>
+                <div class="img-counter"><span id="curIdx">1</span> / <span id="totalIdx">1</span></div>
+            </div>
+            
+            <div class="detail-body">
+                <h3 id="mName" style="margin:0 0 15px 0; color:#2d3748;"></h3>
+                <p>🆔 รหัส: <b id="mId"></b></p>
+                <p>🔢 จำนวนคงเหลือ: <b id="mQty" style="color:#2575fc; font-size:1.1rem;"></b></p>
+                <p>📍 สถานที่จัดเก็บ: <b id="mLoc"></b></p>
+                <p style="color:#999; font-size:12px;">📅 วันที่บันทึก: <span id="mDate"></span></p>
+                
+                <button class="btn-delete-main" id="delBtn">🗑️ ลบสินค้านี้ออกจากระบบ</button>
+                <button class="btn-close" onclick="closeModal()">ปิดหน้าต่าง</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+    const scriptURL = 'https://script.google.com/macros/s/AKfycbybJjrPOTtgsFyVi-VBGHO1KMLOoxoaUWoAljEkqtYpg6F04XOXEC7qnfjtN5EjmjE/exec';
+    const cat = new URLSearchParams(window.location.search).get('cat');
+    document.getElementById('catTitle').innerText = '📁 ' + cat;
+
+    let currentImages = [];
+    let currentIndex = 0;
+    let currentItem = null;
+
+    const data = JSON.parse(localStorage.getItem('stock_cache') || "[]");
+    const filtered = data.filter(i => i.cat === cat);
+    const list = document.getElementById('list');
+
+    if(filtered.length === 0) {
+        list.innerHTML = '<div style="text-align:center; padding:50px; color:#999;">ยังไม่มีสินค้าในหมวดนี้</div>';
+    }
+
+    filtered.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'item-card';
+        div.onclick = () => openModal(item);
+        
+        let imgs = [];
+        try { imgs = JSON.parse(item.img || "[]"); } catch(e){}
+
+        div.innerHTML = `
+            <button class="btn-del-card" onclick="event.stopPropagation(); deleteItem('${item.id}', '${item.name}')">🗑️</button>
+            <div class="item-info">
+                <b>${item.name}</b>
+                <small>รหัส: ${item.id} | คงเหลือ: ${item.qty}</small>
+                <small>📍 ${item.loc}</small>
+            </div>
+            <div class="thumb-preview">
+                ${imgs.map(src => `<img src="${src}">`).join('')}
+            </div>
+        `;
+        list.appendChild(div);
+    });
+
+    function openModal(item) {
+        currentItem = item;
+        document.getElementById('mName').innerText = item.name;
+        document.getElementById('mId').innerText = item.id;
+        document.getElementById('mQty').innerText = item.qty;
+        document.getElementById('mLoc').innerText = item.loc;
+        document.getElementById('mDate').innerText = item.date;
+        
+        try {
+            currentImages = JSON.parse(item.img || "[]");
+        } catch(e) { currentImages = []; }
+
+        currentIndex = 0;
+        updateSlider();
+        
+        document.getElementById('delBtn').onclick = () => deleteItem(item.id, item.name);
+        document.getElementById('modal').style.display = 'flex';
+    }
+
+    function updateSlider() {
+        const imgTag = document.getElementById('mImg');
+        if (currentImages.length > 0) {
+            imgTag.src = currentImages[currentIndex];
+            document.getElementById('curIdx').innerText = currentIndex + 1;
+            document.getElementById('totalIdx').innerText = currentImages.length;
+        } else {
+            imgTag.src = 'https://via.placeholder.com/400x300?text=No+Image';
+            document.getElementById('curIdx').innerText = 0;
+            document.getElementById('totalIdx').innerText = 0;
+        }
+    }
+
+    function changeImg(dir) {
+        currentIndex += dir;
+        if (currentIndex < 0) currentIndex = currentImages.length - 1;
+        if (currentIndex >= currentImages.length) currentIndex = 0;
+        updateSlider();
+    }
+
+    function closeModal() {
+        document.getElementById('modal').style.display = 'none';
+    }
+
+    async function deleteItem(id, name) {
+        if (!confirm(`คุณแน่ใจใช่ไหมที่จะลบ "${name}" ?`)) return;
+
+        const btn = document.getElementById('delBtn');
+        btn.disabled = true;
+        btn.innerText = "กำลังลบ...";
+
+        try {
+            await fetch(scriptURL, {
+                method: 'POST',
+                mode: 'no-cors',
+                body: JSON.stringify({ action: "delete", id: id, name: name })
+            });
+            
+            alert('ลบข้อมูลเรียบร้อยแล้ว');
+            // ลบจาก Cache ในเครื่องด้วยเพื่อให้หน้าจออัปเดตทันที
+            const updatedData = data.filter(i => !(i.id == id && i.name == name));
+            localStorage.setItem('stock_cache', JSON.stringify(updatedData));
+            location.reload();
+        } catch (err) {
+            alert('เกิดข้อผิดพลาดในการลบ');
+            btn.disabled = false;
+            btn.innerText = "🗑️ ลบสินค้านี้ออกจากระบบ";
+        }
+    }
+</script>
+</body>
+</html>

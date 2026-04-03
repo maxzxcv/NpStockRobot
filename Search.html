@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>คลังสินค้า</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600&display=swap');
+        body { font-family: 'Prompt', sans-serif; padding: 15px; background: #f4f7f6; margin: 0; }
+        .container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .btn-nav { background: #28a745; color: white; text-decoration: none; padding: 10px 18px; border-radius: 12px; font-weight: bold; }
+        .category-container { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .cat-chip { background: #f8faff; padding: 20px 10px; border-radius: 15px; border: 1px solid #e2e8f0; text-align: center; cursor: pointer; }
+        .cat-count { background: #2575fc; color: white; padding: 2px 10px; border-radius: 10px; font-size: 12px; }
+        .search-box { width: 100%; padding: 15px; border-radius: 12px; border: 1px solid #ddd; margin-bottom: 20px; box-sizing: border-box; font-family: 'Prompt'; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header-flex">
+        <h2 style="margin:0; color:#2575fc;">📦 รายการอะไหล่</h2>
+        <a href="add_Item.html" class="btn-nav">+ เพิ่มของ</a>
+    </div>
+    <input type="text" id="searchInput" class="search-box" oninput="render()" placeholder="ค้นหาหมวดหมู่...">
+    <div id="categoryChips" class="category-container"></div>
+</div>
+
+<script>
+    const scriptURL = 'https://script.google.com/macros/s/AKfycbybJjrPOTtgsFyVi-VBGHO1KMLOoxoaUWoAljEkqtYpg6F04XOXEC7qnfjtN5EjmjE/exec'; 
+    const allCategories = ["drive 08", "drive 16", "drive 32", "drive 48", "drive 64", "KPS", "MFC", "DSE", "Safety95", "SafetyXP", "Com95", "ComXP", "การ์ดจอ"];
+    let stockData = [];
+
+    async function fetchData() {
+        try {
+            const res = await fetch(scriptURL + '?t=' + new Date().getTime());
+            stockData = await res.json();
+            localStorage.setItem('stock_cache', JSON.stringify(stockData));
+            render();
+        } catch (e) { console.error(e); }
+    }
+
+    function render() {
+        const container = document.getElementById('categoryChips');
+        const search = document.getElementById('searchInput').value.toLowerCase();
+        container.innerHTML = '';
+        allCategories.filter(cat => cat.toLowerCase().includes(search)).forEach(cat => {
+            const count = stockData.filter(i => String(i.cat).trim() === String(cat).trim()).length;
+            const chip = document.createElement('div');
+            chip.className = 'cat-chip';
+            chip.innerHTML = `<b>${cat}</b><br><span class="cat-count">${count} รายการ</span>`;
+            chip.onclick = () => location.href = `view_category.html?cat=${encodeURIComponent(cat)}`;
+            container.appendChild(chip);
+        });
+    }
+
+    const cached = localStorage.getItem('stock_cache');
+    if(cached) { stockData = JSON.parse(cached); render(); }
+    fetchData();
+</script>
+</body>
+</html>
